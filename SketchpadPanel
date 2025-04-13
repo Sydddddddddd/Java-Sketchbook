@@ -1,0 +1,340 @@
+//This is the Panel class. It handes all the logic of the program. 
+// I attached comments below so that my code is more readable and easier to understand. 
+
+
+//these are my imports
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
+import javax.swing.Timer; //this specifically is the import i need for the timer
+public class SketchpadPanel extends JPanel {
+
+    private int w, h;
+    private JRadioButton black, red, green, blue; // color buttons
+    private JRadioButton freehand, rectangle, ellipse; //mode buttons
+    private JCheckBox gridlines; // gridlines checkbox
+    private ArrayList<ArrayList<Point>> segments = new ArrayList<ArrayList<Point>>(); //List of all freehand segments
+    private ArrayList<Color> segmentColors = new ArrayList<Color>(); //Corresponding colors for each segment
+    private ArrayList<Point> currentSegment = null; //Current segment being drawn (temporary data)
+    private JButton undo, replay; //adds the extra undo and replay buttons
+    private boolean showGridlines; //boolean for gridlines state in teh checkbox
+    private Color currentColor = Color.BLACK; //currentcolor will track the current color selected in the program. 
+    private Point startPoint = null; //Starting point for rectangle or ellipse
+    private ArrayList<Point> tempShape = null; //Temporary shape for rectangle or ellipse (temporary data)
+    private Timer replayTimer; //makes the replaytimer
+    private int replayIndex = 0; //sets the index to 0 so that the replay button goes through everything in order. 
+  
+    
+    public SketchpadPanel(int w, int h) {
+        this.w = w;
+        this.h = h;
+        this.setPreferredSize(new Dimension(w, h));
+        this.setLayout(null); //allows custom positioning
+        //radio buttons for color
+        JPanel colorPane = new JPanel();
+        colorPane.setLayout(new GridLayout(4, 1)); //4 rows and 1 column
+        colorPane.setBounds(10, 10, 100, 120);
+        black = new JRadioButton("black");
+        red = new JRadioButton("red");
+        green = new JRadioButton("green");
+        blue = new JRadioButton("blue");
+        ButtonGroup colorGroup = new ButtonGroup();//adds radio buttons to a group so that only one color is selectable
+        colorGroup.add(black);
+        colorGroup.add(red);
+        colorGroup.add(green);
+        colorGroup.add(blue);
+        colorPane.add(black);
+        colorPane.add(red);
+        colorPane.add(green);
+        colorPane.add(blue);
+        this.add(colorPane);//adds subpannel to the main panel
+        
+        //Set black as default color
+        black.setSelected(true);
+
+        //add action listeners for color buttons
+        black.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                currentColor = Color.BLACK;
+            }
+        });
+        red.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                currentColor = Color.RED;
+            }
+        });
+        green.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                currentColor = Color.GREEN;
+            }
+        });
+        blue.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                currentColor = Color.BLUE;
+            }
+        });
+
+        //Radio buttons for draw mode
+        JPanel modePane = new JPanel();
+        modePane.setLayout(new GridLayout(3, 1)); //The grid layout is 3 rows 1 column
+        modePane.setBounds(120, 10, 100, 90); 
+        freehand = new JRadioButton("freehand");
+        rectangle = new JRadioButton("rectangle");
+        ellipse = new JRadioButton("ellipse");
+        ButtonGroup drawGroup = new ButtonGroup(); 
+        drawGroup.add(freehand);
+        drawGroup.add(rectangle);
+        drawGroup.add(ellipse);
+        modePane.add(freehand);
+        modePane.add(rectangle);
+        modePane.add(ellipse);
+        this.add(modePane); //adds modePane to the main panel, with all of the drawing functions
+
+        //Set default draw mode
+        freehand.setSelected(true);
+
+        //Checkbox for gridlines
+        gridlines = new JCheckBox("gridlines");
+        gridlines.setBounds(10, 140, 100, 30); //sets position for gridlines
+        gridlines.setFocusable(false); //removes the annoying box that pops up with the checkbox
+        gridlines.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                showGridlines = gridlines.isSelected(); //Update the state of gridlines
+                repaint(); //Repaint to reflect the new grid line state
+            }
+        });
+
+        //Undo button
+        undo = new JButton("undo");
+        undo.setBounds(10, 180, 100, 30); //sets position for undo
+        undo.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                if (!segments.isEmpty()) {
+                    segments.remove(segments.size() - 1); //remove the last segment
+                    segmentColors.remove(segmentColors.size() - 1); //Remove the corresponding color of the segment
+                }
+                repaint(); //Repaint the panel
+            }
+        });
+
+        //Replay button
+        replay = new JButton("replay"); 
+        replay.setBounds(120, 180, 100, 30); //sets position for replay 
+        replay.addActionListener(new ActionListener() { 
+            public void actionPerformed(ActionEvent e) { 
+                if (!segments.isEmpty()) { 
+                    replayIndex = 0; //Reset the replay index
+                    ArrayList<ArrayList<Point>> replaySegments = new ArrayList<ArrayList<Point>>(segments); //Makes copy of the segments since we have (segments) present and in the paranthesis.
+                    ArrayList<Color> replayColors = new ArrayList<Color>(segmentColors);  //Same thing here, just for the colors. 
+                    segments.clear(); //Temporarily clear the segments for the replay
+                    segmentColors.clear(); //Temporarily clear the colors for the replay
+                    repaint(); //Repaint to show the blank canvas
+
+                    // Timer for replaying each segment
+                    replayTimer = new Timer(100, new ActionListener() { 
+                        public void actionPerformed(ActionEvent e) { 
+                            if (replayIndex < replaySegments.size()) {
+                                segments.add(replaySegments.get(replayIndex)); //Add the next segment back
+                                segmentColors.add(replayColors.get(replayIndex)); //Add the color of the corresponding segment
+                                replayIndex++; //Increment the replay index
+                                repaint(); //adds the segment to the canvas
+                            } else {
+                                replayTimer.stop(); //Stop the timer when all segments are displayed
+                            }
+                        }
+                    });
+                    replayTimer.start(); // Start the replay timer
+                }
+            }
+        });
+
+        
+     
+        // Add everything
+        this.add(gridlines);
+        this.add(undo);
+        this.add(replay);
+        this.addMouseMotionListener(new MML());
+
+        // Adds a mouse listener to handle mouse press and release 
+        this.addMouseListener(new MouseAdapter() {
+            public void mousePressed(MouseEvent e) { 
+                if (freehand.isSelected()) { 
+                    currentSegment = new ArrayList<Point>(); //Start a new segment if freehand is selected
+                    currentSegment.add(e.getPoint()); //add the starting point
+                } else if (rectangle.isSelected() || ellipse.isSelected()) { 
+                    startPoint = e.getPoint(); //store the starting point of the shape
+                    tempShape = new ArrayList<Point>(); //Initializes temporary shape storage
+                }
+            }
+
+            public void mouseReleased(MouseEvent e) { 
+                if (freehand.isSelected() && currentSegment != null) { 
+                    segments.add(currentSegment); //Add the current segment to the list
+                    segmentColors.add(currentColor); //saves the color of the segment
+                    currentSegment = null; //Resets the temporary segment so that a new segment will be drawn normally
+                } else if (rectangle.isSelected() && startPoint != null) { 
+                    int x1 = startPoint.x; //starting x cord
+                    int y1 = startPoint.y; //starting y cord
+                    int x2 = e.getPoint().x; //ending x cord
+                    int y2 = e.getPoint().y; //ending y cord
+                    tempShape.clear(); //clear last shape data
+                    //adds corners and closes rectangle
+                    tempShape.add(new Point(x1, y1)); 
+                    tempShape.add(new Point(x2, y1)); 
+                    tempShape.add(new Point(x2, y2)); 
+                    tempShape.add(new Point(x1, y2)); 
+                    tempShape.add(new Point(x1, y1)); 
+                    segments.add(new ArrayList<Point>(tempShape)); // Save the rectangle
+                    segmentColors.add(currentColor); //Save the rectangle's color
+                    startPoint = null; //set starting point to null so it is reset
+                } else if (ellipse.isSelected() && startPoint != null) { 
+                    int x1 = startPoint.x; //starting x cord
+                    int y1 = startPoint.y; //starting y cord
+                    int x2 = e.getPoint().x; //ending x cord
+                    int y2 = e.getPoint().y; //ending y cord
+                    tempShape.clear(); //clear last shape data
+                    //calculates the center of the elipse
+                    int centerX = (x1 + x2) / 2; 
+                    int centerY = (y1 + y2) / 2; 
+                    //calculates the radius of the elipse
+                    int radiusX = Math.abs(x1 - x2) / 2; 
+                    int radiusY = Math.abs(y1 - y2) / 2; 
+                    int i = 0; 
+                    while (i < 360) { 
+                        double angle = Math.toRadians(i); // Convert angle to radians
+                        int x = (int) (centerX + radiusX * Math.cos(angle)); //Calculate x cord of the point at that angle
+                        int y = (int) (centerY + radiusY * Math.sin(angle)); //Calculate y cord of the point at that angle
+                        tempShape.add(new Point(x, y)); //Add the point to the shape
+                        i++; 
+                    }
+                    segments.add(new ArrayList<Point>(tempShape)); //Save the ellipse
+                    segmentColors.add(currentColor); //saves the ellipses color
+                    startPoint = null; //set starting point to null so it is reset
+                }
+                tempShape = null; //Reset the temp shape
+                repaint(); //Updates the canvas
+            }
+        });
+    }
+
+
+
+    // Paints all segments
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
+
+        // Gridlines
+        if (showGridlines) {
+            g.setColor(Color.LIGHT_GRAY);
+            int gridSize = 100; // Size of each grid cell 
+            int x = 0;
+            while (x <= w) {
+                g.drawLine(x, 0, x, h); // Vertical lines
+                x += gridSize;
+            }
+
+            int y = 0;
+            while (y <= h) {
+                g.drawLine(0, y, w, y); // Horizontal lines
+                y += gridSize;
+            }
+        }
+
+        // Draw each segment (as it stays on the canvas)
+        int index = 0; 
+        while (index < segments.size() && index < segmentColors.size()) { 
+            ArrayList<Point> segment = segments.get(index); //Get the current segment
+            g.setColor(segmentColors.get(index)); //setsthe color for the segment
+
+            if (segment.size() > 1) { //checks if multiple points are present
+                int i = 1;
+                Point first = segment.get(0); //Gets the first point
+                while (i < segment.size()) { 
+                    Point next = segment.get(i); // Get the next point
+                    g.drawLine(first.x, first.y, next.x, next.y); //Draw a line between points
+                    first = next; // Move to the next point
+                    i++;
+                }
+            }
+            index++; // Move to the next segment
+        }
+        
+        //Draws shape as it is draged
+        if (tempShape != null && !tempShape.isEmpty()) { 
+            g.setColor(currentColor); //Set the color to the selected color from the radio buttons
+            Point first = tempShape.get(0); //Get the first point
+            int i = 1; //I is 1 because we iterate from the second index forward
+            while (i < tempShape.size()) { 
+                Point next = tempShape.get(i); //gets the next point
+                g.drawLine(first.x, first.y, next.x, next.y); //Draw a line between points
+                first = next; //Move to the next point
+                i++; 
+            }
+        }
+
+        // Draw the line segment (as it is dragged)
+        if (currentSegment != null && currentSegment.size() > 1) { 
+            g.setColor(currentColor); //Set the color to the selected color from the radio buttons
+            Point first = currentSegment.get(0); //Get the first point
+            int i = 1; //I is 1 because we iterate from the second index forward
+            while (i < currentSegment.size()) {
+                Point next = currentSegment.get(i); //gets next point
+                g.drawLine(first.x, first.y, next.x, next.y); //Draw a line between points
+                first = next; //moves to next point
+                i++; 
+            }
+        }
+        
+    }
+
+    private class MML implements MouseMotionListener {
+
+        public void mouseDragged(MouseEvent e) { 
+            if (freehand.isSelected() && currentSegment != null) { 
+                currentSegment.add(e.getPoint()); //adds teh current location of the mouse as a point
+                repaint(); //Repaints canvas to update the segment
+            } else if ((rectangle.isSelected() || ellipse.isSelected()) && startPoint != null) { 
+                //gets the starting x and y coordinates  
+            	int x1 = startPoint.x; 
+                int y1 = startPoint.y; 
+                //gets the current x and y coordinates
+                int x2 = e.getPoint().x; 
+                int y2 = e.getPoint().y; 
+                tempShape.clear(); //clear previous shape data
+
+                if (rectangle.isSelected()) { 
+                	//Adding the corners of the rectangle
+                    tempShape.add(new Point(x1, y1)); 
+                    tempShape.add(new Point(x2, y1)); 
+                    tempShape.add(new Point(x2, y2)); 
+                    tempShape.add(new Point(x1, y2)); 
+                    tempShape.add(new Point(x1, y1)); // Close the rectangle
+                } else if (ellipse.isSelected()) { 
+                	//find elipse center
+                    int centerX = (x1 + x2) / 2; 
+                    int centerY = (y1 + y2) / 2; 
+                    //x radius and y radius of elipse
+                    int radiusX = Math.abs(x1 - x2) / 2; 
+                    int radiusY = Math.abs(y1 - y2) / 2; 
+                    int i = 0; 
+                    while (i < 360) { //go through all 360 degrees of the elipse to find the appropriate points
+                        double angle = Math.toRadians(i); // Convert the current angle to radians
+                        //calculates each x adn y cordinate at the respective angle. 
+                        int x = (int) (centerX + radiusX * Math.cos(angle)); 
+                        int y = (int) (centerY + radiusY * Math.sin(angle)); 
+                        tempShape.add(new Point(x, y)); // Add the point to the temporary shape
+                        i++; 
+                    }
+                }
+                repaint(); //repaints to show the new TEMPORARY shape
+            }
+        }
+
+        public void mouseMoved(MouseEvent e) { 
+        	
+        }
+    }
+    
+}
