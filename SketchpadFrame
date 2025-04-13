@@ -1,0 +1,20 @@
+//This is the frame class. It is connected to the panel class. 
+import javax.swing.JFrame;
+
+public class SketchpadFrame
+{
+
+public static void main(String[] args)
+{
+//W and H can be changed accordingly. They represent the width and height of the panel. 
+int w = 800;
+int h = 800;
+JFrame frame = new JFrame();
+frame.setDefaultCloseOperation(3);
+frame.getContentPane().add(new SketchpadPanel(w,h));
+frame.pack();
+frame.setVisible(true);
+
+}
+
+}
